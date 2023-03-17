@@ -47,10 +47,10 @@ ui <- fluidPage(
         )
       ),
       fluidRow(
-        column(6,
+        column(3,
                p("Analysis status:"),
         ),
-        column(6,
+        column(9,
                textOutput('check')
         )
       ),
