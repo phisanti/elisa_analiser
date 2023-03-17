@@ -65,27 +65,145 @@ agg_tables <- function(table_lists, env_vars) {
   return(merged_table)
 }
 
+# Normal linear regression
+
+fitlm <- function(d){
+  std_model <- lm(signal ~ conc, data = d)
+
+  return(std_model)
+}
+
+# Interpolate linear regression
+interpolate_lm_x <- function(y_values, model) {
+  model_coef <- coef(model)
+  par_a <- model_coef[1] 
+  par_b <- model_coef[2] 
+  
+  x_values <- (y_values - par_a)/par_b
+  return(x_values)
+}
+
+# 4PL-regression
+fit4pl <- function(d) {
+  
+  model <- drm(signal~conc, data = d, fct = LL.4())
+  return(model)
+}
+
+# Interpolate 4PL
+interpolate_4pl_x <- function(y_values, model) {
+  
+  model_coef <- coef(model)
+  par_b <- model_coef[1] 
+  par_c <- model_coef[2]
+  par_d <- model_coef[3] 
+  par_e <- model_coef[4] 
+  # Reverse y=c + (d-c)/(1+exp(b(log(x)-log(e)))
+  
+  x_values <- (log(par_d) - log(y_values))/par_b + log(par_e) 
+  return(exp(x_values))
+}
+
+
+# R^2 calculation for DRC
+
+custom_R2 <- function(y, y_hat) {
+  SS_res <- sum((y - y_hat) ^ 2)
+  SS_tot <- sum((y - mean(y)) ^ 2)
+  R2 <- 1 - SS_res / SS_tot
+  return(R2)
+}
+
+lm_to_latex <- function(model, R2) {
+  # Extract the coefficients and names of the regressors
+  coefs <- coef(model)
+  names <- names(coefs)
+  
+  # Initialize the formula string with the intercept
+  eqn <- paste0(round(coefs[1], digits = 2))
+  
+  # Loop over the remaining coefficients and add them to the formula string
+  for (i in 2:length(coefs)) {
+    coef_str <- round(coefs[i], digits = 2)
+    if (coef_str > 0) {
+      eqn <- paste0(eqn, " + ", coef_str, names[i])
+    } else {
+      eqn <- paste0(eqn, " - ", abs(coef_str), names[i])
+    }
+  }
+  
+  # Return the final formula string
+  formula_str <-c(paste0("$$R^2 = ", R2,"$$"),
+                  paste0("$$ y = ", eqn, "$$"))
+  
+  return(formula_str)
+}
+
+LL4_to_latex <- function(model, R2) {
+  model_coef <- coefficients(model) %>% round(., digits = 2)
+  par_b <- abs(model_coef[1]) 
+  par_c <- abs(model_coef[2])
+  par_d <- abs(model_coef[3])
+  par_e <- abs(model_coef[4]) 
+  
+  eqn <- paste0("{", par_c, "} + \\frac{", par_d," - ",par_c, "}{1 + e^{", 
+                par_b, " *(log(x) - log(", par_e, "))}} ")
+  formula_str <- c(paste0("$$R^2 = ", R2, "$$"),
+                   paste0("$$ y = ", eqn, "$$")
+                   )
+  return(formula_str)
+}
+
+
+
 # Extrapolate the data in the standard curve
-extrapolate_data <- function(long_data) {
+extrapolate_data <- function(long_data, reg_type = "Linear Regression") {
   
   # Load variables
   z <- data.table::copy(long_data)
   
   # Correct Abs
   z[, corr_wl := wavelenght1 - wavelenght2]
-  z[, backgroud_corr := corr_wl - mean(corr_wl[blank_sample == "blank"])]
-  z[backgroud_corr ==0, backgroud_corr := 1]
-  z[, log_signal := log10(backgroud_corr * dilution) ]
-  
+  z[, signal := corr_wl - mean(corr_wl[blank_sample == "blank"])]
+
   # Regression model with standard curve
   std_data <- z[standard != "sample"]
   std_data[, c("type","conc") := tstrsplit(standard, "_")]
   std_data[, conc := as.numeric(conc)]
-  std_model <- lm(conc ~ log_signal, data = std_data)
-  z[, real_conc := predict(std_model, newdata = .SD) %>%
-      exp]
+  std_data[, `log(conc)` := log(conc)]
   
-  return(z)
+  if (reg_type == "Linear Regression") {
+    model <- fitlm(std_data)
+    z[, interpolated_conc := interpolate_lm_x(y_values = signal, model)]
+    std_data[, fitted_y := predict(model, newdata = .SD)]
+    R2 <- custom_R2(y = std_data$signal, std_data$fitted_y)
+    latex <- lm_to_latex(model, round(R2, 4))
+    
+  } else if (reg_type == "4-Parameters Logistic") {
+    model <- fit4pl(std_data)
+    z[, interpolated_conc := exp(interpolate_4pl_x(y_values = signal, model))]
+    std_data[, fitted_y := predict(model, newdata = .SD)]
+    R2 <- custom_R2(y = std_data$signal, std_data$fitted_y)
+    latex <- LL4_to_latex(model, round(R2, 4))
+    
+  } else {
+    stop()
+  }
+  
+  # Get real conc
+  z[, real_conc := interpolated_conc * dilution]
+  
+  # Plot data
+  ggp <- ggplot(std_data, aes(x = conc)) +
+    geom_line(aes(y = fitted_y), col = "black") +
+    geom_point(aes(y = signal), col = "red") +
+    labs(y = "Signal", x = "Concentration") +
+    theme_minimal(base_size = 20)
+  
+  out <- list(data = z, model = model, plot = ggp, latex = latex)
+
+    
+  return(out)
   
 }
 

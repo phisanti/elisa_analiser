@@ -1,11 +1,7 @@
 #
-# This is a Shiny web application. You can run the application by clicking
-# the 'Run App' button above.
-#
-# Find out more about building applications with Shiny here:
-#
-#    http://shiny.rstudio.com/
-#
+# This is the main script for the shiny application. It contains the server
+# and the IU functions. 
+# 
 
 library(shiny)
 library(DT)
@@ -15,7 +11,9 @@ library(data.table)
 library(rhandsontable)
 library(shinydashboard)
 
-import::from("R/app_utils.R", env_vars, empty_dt, agg_tables, extrapolate_data)
+source("R/app_utils.R")
+#import::from("app_utils.R", env_vars, empty_dt, agg_tables, extrapolate_data, lm_to_latex)
+
 # Define UI for the application
 ui <- fluidPage(
   theme = shinythemes::shinytheme("flatly"),
@@ -25,25 +23,46 @@ ui <- fluidPage(
       h1("How to use this tool"),
       br(),
       p(HTML(env_vars$text$introduction)),
-      actionButton(inputId="run_data_processing",
-                   label="Run Data Processing"),
-      conditionalPanel(condition = "input.run_data_processing > 0",
-                       downloadButton("download_data", "Download Processed Data")),
-      br(),
-      p("If you encounter any issues, please email at:", 
-        a("cms206@cam.ac.uk", href="mailto:cms206@cam.ac.uk"), ".")
-      
-    ),
-    mainPanel(
+      fluidRow(
+        column(6,
+               selectInput("reg_type", label = "Choose a fitting model:",
+                           choices = c("Linear Regression", "4-Parameters Logistic"))
+        )),
       fluidRow(
         column(6, 
-               box(
-                 title = "Input data",
-                 width = NULL
+               actionButton(inputId="run_data_processing",
+                            label="Run Data Processing"),
+               conditionalPanel(
+                 condition = "input.run_data_processing > 0 & (output.check != 'ok')",
+                 tags$p(
+                   style = "color: red",
+                   "Please fill all the tabs before processing the data"
                  )
                )
-        
+        ),
+        column(6,
+               conditionalPanel(condition = "input.run_data_processing > 0 & output.check == 'ok'",
+                                downloadButton("download_data", "Download Processed Data")
+               )
+        )
       ),
+      fluidRow(
+        column(6,
+               p("Analysis status:"),
+        ),
+        column(6,
+               textOutput('check')
+        )
+      ),
+      br(),
+      fluidRow(
+        column(12,
+               p("If you encounter any issues, please email at:", 
+                 a("cms206@cam.ac.uk", href="mailto:cms206@cam.ac.uk"), ".")
+        )
+      )
+    ),
+    mainPanel(h1("Input data"),
       # Use do.call to pass the list of tabPanels as separate arguments
       do.call(tabsetPanel,
               c(id = "plate_tabs",
@@ -52,9 +71,15 @@ ui <- fluidPage(
                            rHandsontableOutput(plate)
                            )
                 }))),
-      
-      uiOutput('explanation'),
-
+      fluidRow(
+        column(6, 
+                uiOutput('explanation')
+               ),
+        column(6, 
+               plotOutput('regplot')
+        )
+        
+        ),
       dataTableOutput(outputId="longtable")
     )
   )
@@ -66,6 +91,7 @@ server <- function(input, output, session) {
   plates <- env_vars$plate_names
   values <- vector("list", length = length(plates))
   names(values) <- plates
+  output$check <- renderText("Waiting for input")
   
   # Create 96-template tabs
   for (i in seq_along(plates)) {
@@ -105,16 +131,38 @@ server <- function(input, output, session) {
     # Do not allow to continue if the user has not filled all the tabs
     out_data <- Filter(Negate(is.null), out_data)
     req(length(out_data) == length(plates))
+    output$check <- renderText(
+      if (length(out_data) == length(plates)) {
+        "ok"
+      } else {
+          "not ok"
+        }
+      )
     
     # Process the data
     d <- agg_tables(out_data, env_vars)
-    d <- extrapolate_data(d)
+    extra_d <- reactive({
+
+      extrapolate_data(d, reg_type = input$reg_type)})
+    d <- extra_d()$data
+    model <- extra_d()$model
+    reg_plot <- extra_d()$plot
+    latex <- extra_d()$latex
     
     # Display output and allow download
     output$explanation <- renderUI({
-      h1("Output data")
+      tagList(h1("Output data"),
+              p("The data has been interpolated using the following equation:"),
+              p(""),
+              p(withMathJax(latex[1])),
+              p(withMathJax(latex[2])),
+              p(),
       p("Here is the transformed table")
+      )
     })
+    
+    output$regplot <- renderPlot({reg_plot})
+
     output$longtable <- renderDataTable({
       datatable(d)
     })

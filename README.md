@@ -11,8 +11,6 @@ This is a Shiny web application for processing assay data. The app allows users 
 ## Downloading Data
 - The processed data can be downloaded as CSV.
 - The download option is only available after the user has clicked the "Process Data" button.
-## Contact
-If you encounter any problems or have any feedback, please contact mx@gmail.com.
 ## Contributing
 Contributions are welcome! Please submit a pull request with your changes.
 For major changes, please open an issue first to discuss what you would like to change.

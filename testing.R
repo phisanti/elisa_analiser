@@ -1,0 +1,22 @@
+d <- read.table('clipboard', sep = " ")
+
+d
+
+d <- data.table(conc = c(250, 250, 125, 125, 62.5, 62.5, 31, 31, 15, 15, 7, 7, 3, 3),
+           signal = c(2.2, 2.3, 1, 1.1, 0.53, 0.55, 0.22, 0.21, 0.08, 0.099, 0.029, 0.04, 0.0065, 0.0155))
+d[, logconc := log(conc)]
+
+ggplot(d, aes(x = conc, y = signal)) +
+  geom_point() +
+  geom_point(aes(x = logconc), col = "red") +
+  theme_minimal()
+
+melt.data.table(d, id.vars = "signal") %>% 
+  ggplot(., aes(x = value, y = signal)) +
+  geom_point() +
+  facet_wrap(variable ~ ., scales = "free") +
+  theme_minimal()
+ 
+lm(conc ~ signal, data =d) %>% summary()
+lm(logconc ~ signal, data =d) %>% summary()
+
