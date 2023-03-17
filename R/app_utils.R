@@ -2,7 +2,12 @@
 # This script contains all the auxiliary functions necessary to run the shiny 
 # app adequately
 
-# Generate empty the template data.frames
+#' Empty tables generator
+#' @description Generate empty the template data.frames 
+#' @param type Type of data to fill the table with.
+#'
+#' @return A data.table filled with the expected type. 
+
 empty_dt <- function(type){
   
   if (type == "numeric") {
@@ -33,7 +38,14 @@ empty_dt <- function(type){
   
 }
 
-# Combine the tables in one and make them long format
+#' Tables aggregator
+#' 
+#' @description Pivots and merges the data.tables 
+#' @param table_lists a list of data.tables. 
+#' @param env_vars The list of variables.
+#'
+#' @return A merged long data.table
+
 agg_tables <- function(table_lists, env_vars) {
   
   # Load vars
@@ -60,20 +72,29 @@ agg_tables <- function(table_lists, env_vars) {
   }
   
   merged_table <- Reduce(function (...) { merge(..., all = TRUE) },   # Full join
-         out_long)
+                         out_long)
   
   return(merged_table)
 }
 
-# Normal linear regression
+#' Normal linear regression
+#' 
+#' @description Runs a linear regression from the data
+#' @param d data set
+#' @return Linear model
 
 fitlm <- function(d){
   std_model <- lm(signal ~ conc, data = d)
-
+  
   return(std_model)
 }
 
-# Interpolate linear regression
+#' Interpolate linear regression
+#' @description Interpolates the x values from the y values using the linear model
+#' @param y_values The y values to interpolate
+#' @param model The model to use for interpolation
+#' @return The x values
+
 interpolate_lm_x <- function(y_values, model) {
   model_coef <- coef(model)
   par_a <- model_coef[1] 
@@ -83,29 +104,43 @@ interpolate_lm_x <- function(y_values, model) {
   return(x_values)
 }
 
-# 4PL-regression
+#' 4PL-regression
+#' @description Runs a 4PL regression from the data
+#' @param d data set
+#' @return 4PL model
+
 fit4pl <- function(d) {
   
   model <- drm(signal~conc, data = d, fct = LL.4())
   return(model)
 }
 
-# Interpolate 4PL
+#' Interpolate 4PL
+#' @description Interpolates the x values from the y values using the 4PL model
+#' @param y_values The y values to interpolate
+#' @param model The model to use for interpolation
+#' @return The x values
+
 interpolate_4pl_x <- function(y_values, model) {
   
+  # Load model parameters
   model_coef <- coef(model)
   par_b <- model_coef[1] 
   par_c <- model_coef[2]
   par_d <- model_coef[3] 
   par_e <- model_coef[4] 
-  # Reverse y=c + (d-c)/(1+exp(b(log(x)-log(e)))
   
+  # Reverse y=c + (d-c)/(1+exp(b(log(x)-log(e)))
   x_values <- (log(par_d) - log(y_values))/par_b + log(par_e) 
   return(exp(x_values))
 }
 
 
-# R^2 calculation for DRC
+#' R^2 calculation for DRC
+#' @description Calculates the R^2 value for a DRC
+#' @param y The y values
+#' @param y_hat The predicted y values
+#' @return The R^2 value
 
 custom_R2 <- function(y, y_hat) {
   SS_res <- sum((y - y_hat) ^ 2)
@@ -113,6 +148,12 @@ custom_R2 <- function(y, y_hat) {
   R2 <- 1 - SS_res / SS_tot
   return(R2)
 }
+
+#' LM to latex
+#' @description Generates a latex formula from a linear model.
+#' @param model The model to use for interpolation
+#' @param R2 The R^2 value
+#' @return The latex formula
 
 lm_to_latex <- function(model, R2) {
   # Extract the coefficients and names of the regressors
@@ -139,6 +180,12 @@ lm_to_latex <- function(model, R2) {
   return(formula_str)
 }
 
+#' 4-parameters logistic to latex 
+#' @description Generates a latex formula from a 4-parameters logistic model.
+#' @param model The model to use for interpolation
+#' @param R2 The R^2 value
+#' @return The latex formula
+
 LL4_to_latex <- function(model, R2) {
   model_coef <- coefficients(model) %>% round(., digits = 2)
   par_b <- abs(model_coef[1]) 
@@ -150,13 +197,16 @@ LL4_to_latex <- function(model, R2) {
                 par_b, " *(log(x) - log(", par_e, "))}} ")
   formula_str <- c(paste0("$$R^2 = ", R2, "$$"),
                    paste0("$$ y = ", eqn, "$$")
-                   )
+  )
   return(formula_str)
 }
 
+#'  Extrapolate the data in the standard curve
+#' @description Generates a latex formula from a 4-parameters logistic model.
+#' @param long_data The long data set
+#' @param reg_type The regression type
+#' @return The latex formula
 
-
-# Extrapolate the data in the standard curve
 extrapolate_data <- function(long_data, reg_type = "Linear Regression") {
   
   # Load variables
@@ -165,7 +215,7 @@ extrapolate_data <- function(long_data, reg_type = "Linear Regression") {
   # Correct Abs
   z[, corr_wl := wavelenght1 - wavelenght2]
   z[, signal := corr_wl - mean(corr_wl[blank_sample == "blank"])]
-
+  
   # Regression model with standard curve
   std_data <- z[standard != "sample"]
   std_data[, c("type","conc") := tstrsplit(standard, "_")]
@@ -201,8 +251,8 @@ extrapolate_data <- function(long_data, reg_type = "Linear Regression") {
     theme_minimal(base_size = 20)
   
   out <- list(data = z, model = model, plot = ggp, latex = latex)
-
-    
+  
+  
   return(out)
   
 }
@@ -210,14 +260,14 @@ extrapolate_data <- function(long_data, reg_type = "Linear Regression") {
 # Different useful variables
 env_vars <- list(plate_names = c("wavelenght1", "wavelenght2", "dilution", "standard", 
                                  "blank_sample","celltype", "treatments"),
-              plate_types = c("wavelenght1" = "numeric", 
-                              "wavelenght2" = "numeric",
-                              "dilution" = "numeric", 
-                              "standard" = "character_std", 
-                              "blank_sample" = "character_blank",
-                              "celltype" = "character", 
-                              "treatments" = "character"),
-              text = list(introduction = "
+                 plate_types = c("wavelenght1" = "numeric", 
+                                 "wavelenght2" = "numeric",
+                                 "dilution" = "numeric", 
+                                 "standard" = "character_std", 
+                                 "blank_sample" = "character_blank",
+                                 "celltype" = "character", 
+                                 "treatments" = "character"),
+                 text = list(introduction = "
               <br>The purpose of this tool is tostreamline the process of reshaping 
               the output data generated by the ClarioStar. By automating this 
               task, users can save time and reduce the risk of errors.<br>
@@ -239,6 +289,6 @@ env_vars <- list(plate_names = c("wavelenght1", "wavelenght2", "dilution", "stan
               This allows for easy analysis and interpretation of the results.<br>
 
                           ")
-              
-              )
+                 
+)
 

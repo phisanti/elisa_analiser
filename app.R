@@ -12,12 +12,12 @@ library(rhandsontable)
 library(shinydashboard)
 
 source("R/app_utils.R")
-#import::from("app_utils.R", env_vars, empty_dt, agg_tables, extrapolate_data, lm_to_latex)
 
 # Define UI for the application
 ui <- fluidPage(
   theme = shinythemes::shinytheme("flatly"),
   titlePanel("ClarioStar Reshaping tool"),
+  # Build side panel
   sidebarLayout(
     sidebarPanel(
       h1("How to use this tool"),
@@ -42,26 +42,18 @@ ui <- fluidPage(
         ),
         column(6,
                conditionalPanel(condition = "input.run_data_processing > 0 & output.check == 'ok'",
-                                downloadButton("download_data", "Download Processed Data")
-               )
-        )
-      ),
+                                downloadButton("download_data", "Download Processed Data")))),
       fluidRow(
-        column(3,
-               p("Analysis status:"),
-        ),
-        column(9,
-               textOutput('check')
-        )
-      ),
+        column(3, p("Analysis status:")),
+        column(9, textOutput('check'))),
       br(),
       fluidRow(
         column(12,
                p("If you encounter any issues, please email at:", 
                  a("cms206@cam.ac.uk", href="mailto:cms206@cam.ac.uk"), ".")
-        )
-      )
-    ),
+        ))),
+    
+    # Build main panel
     mainPanel(h1("Input data"),
       # Use do.call to pass the list of tabPanels as separate arguments
       do.call(tabsetPanel,
@@ -72,14 +64,8 @@ ui <- fluidPage(
                            )
                 }))),
       fluidRow(
-        column(6, 
-                uiOutput('explanation')
-               ),
-        column(6, 
-               plotOutput('regplot')
-        )
-        
-        ),
+        column(6, uiOutput('explanation')),
+        column(6, plotOutput('regplot'))),
       dataTableOutput(outputId="longtable")
     )
   )
@@ -157,12 +143,11 @@ server <- function(input, output, session) {
               p(withMathJax(latex[1])),
               p(withMathJax(latex[2])),
               p(),
-      p("Here is the transformed table")
-      )
+      p("Here is the transformed table"))
     })
     
+    
     output$regplot <- renderPlot({reg_plot})
-
     output$longtable <- renderDataTable({
       datatable(d)
     })
@@ -174,7 +159,6 @@ server <- function(input, output, session) {
         write.csv(d, file, row.names = FALSE)
       }
     )
-
   })
 }
 
