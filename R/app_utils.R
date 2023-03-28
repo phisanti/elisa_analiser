@@ -135,6 +135,47 @@ interpolate_4pl_x <- function(y_values, model) {
   return(exp(x_values))
 }
 
+#' Interpolate 4PL
+#' @description Interpolates the x values from the y values using the 4PL model.
+#' In this case, it uses manual approximation in order to facilitate output.
+#' @param y_values The y values to interpolate
+#' @param model The model to use for interpolation
+#' @return The x values
+
+interpolate_4pl_x2 <- function(y_values, model) {
+  
+  min_conc <- min(model$data[ ,1])
+  max_conc <- max(model$data[ ,1])
+  
+  concs <- seq(min_conc/10, max_conc + 10, length.out = 1000)
+  od <- predict(model, newdata = data.table(conc = new_x))
+  
+  # Inverted approx
+  z <- approx(y = concs, x = od, y_values)
+  
+  return(z$y)
+}
+
+#' Interpolate 4PL
+#' @description Interpolates the x values from the y values using the 4PL model.
+#' In this case, a solution fo the equation that I found online.
+#' @param y_values The y values to interpolate
+#' @param model The model to use for interpolation
+#' @return The x values
+
+new_interpolate_4pl_x3 <- function(y_values, model) {
+  
+  # Load model parameters
+  S <- coef(model)[1]
+  LL <- coef(model)[2]
+  UL <- coef(model)[3]
+  ED50 <- coef(model)[4]
+  
+  # Reverse y=c + (d-c)/(1+exp(b(log(x)-log(e)))
+  x_values <- ED50/((UL-y_values)/(y_values))^(-1/S)
+  
+  return(x_values)
+}
 
 #' R^2 calculation for DRC
 #' @description Calculates the R^2 value for a DRC
@@ -231,7 +272,7 @@ extrapolate_data <- function(long_data, reg_type = "Linear Regression") {
     
   } else if (reg_type == "4-Parameters Logistic") {
     model <- fit4pl(std_data)
-    z[, interpolated_conc := exp(interpolate_4pl_x(y_values = signal, model))]
+    z[, interpolated_conc := exp(interpolate_4pl_x2(y_values = signal, model))]
     std_data[, fitted_y := predict(model, newdata = .SD)]
     R2 <- custom_R2(y = std_data$signal, std_data$fitted_y)
     latex <- LL4_to_latex(model, round(R2, 4))
