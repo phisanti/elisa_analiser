@@ -272,7 +272,7 @@ extrapolate_data <- function(long_data, reg_type = "Linear Regression") {
     
   } else if (reg_type == "4-Parameters Logistic") {
     model <- fit4pl(std_data)
-    z[, interpolated_conc := exp(interpolate_4pl_x2(y_values = signal, model))]
+    z[, interpolated_conc := interpolate_4pl_x2(y_values = signal, model)]
     std_data[, fitted_y := predict(model, newdata = .SD)]
     R2 <- custom_R2(y = std_data$signal, std_data$fitted_y)
     latex <- LL4_to_latex(model, round(R2, 4))

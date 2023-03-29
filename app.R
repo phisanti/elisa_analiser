@@ -3,8 +3,9 @@
 # and the IU functions. 
 # 
 
-library(shiny)
 library(DT)
+library(drc)
+library(shiny)
 library(ggplot2)
 library(magrittr)
 library(data.table)
