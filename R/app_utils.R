@@ -148,7 +148,7 @@ interpolate_4pl_x2 <- function(y_values, model) {
   max_conc <- max(model$data[ ,1])
   
   concs <- seq(min_conc/10, max_conc + 10, length.out = 1000)
-  od <- predict(model, newdata = data.table(conc = new_x))
+  od <- predict(model, newdata = data.table(conc = concs))
   
   # Inverted approx
   z <- approx(y = concs, x = od, y_values)
